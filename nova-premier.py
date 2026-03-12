@@ -152,12 +152,30 @@ def try_parse_date_yyyy_mm_dd(raw: str):
     Try many date patterns and return YYYY-MM-DD or None.
     Handles 'Date:' prefix, ordinal suffixes, commas.
     """
+
     if not raw:
         return None
+
     s = _clean_text(raw)
-    s = re.sub(r'(?i)\bdate\s*[:\-]?\s*', '', s)  # remove 'Date:' label
+    s = re.sub(r'(?i)\bdate\s*[:\-]?\s*', '', s)
     s = s.replace(',', ' ').replace('  ', ' ')
     s = re.sub(r'(\d{1,2})(st|nd|rd|th)\b', r'\1', s, flags=re.IGNORECASE)
+
+    # -------- HANDLE 15092026 / 150926 --------
+    if re.match(r'^\d{8}$', s):
+        try:
+            dt = datetime.strptime(s, "%d%m%Y").date()
+            return dt.strftime("%Y-%m-%d")
+        except:
+            pass
+
+    if re.match(r'^\d{6}$', s):
+        try:
+            dt = datetime.strptime(s, "%d%m%y").date()
+            return dt.strftime("%Y-%m-%d")
+        except:
+            pass
+    # ------------------------------------------
 
     numeric_patterns = [
         "%d/%m/%Y","%d-%m-%Y","%d.%m.%Y",
@@ -165,11 +183,12 @@ def try_parse_date_yyyy_mm_dd(raw: str):
         "%m/%d/%Y","%m-%d-%Y","%m.%d.%Y",
         "%m/%d/%y","%m-%d-%y","%m.%d.%y"
     ]
+
     for fmt in numeric_patterns:
         try:
             dt = datetime.strptime(s, fmt).date()
             return dt.strftime("%Y-%m-%d")
-        except Exception:
+        except:
             pass
 
     m = re.match(r'(?i)^\s*(\d{1,2})[\s\-\.]+([A-Za-z]{3,})[\s\-\.]+(\d{2,4})\s*$', s)
@@ -180,7 +199,7 @@ def try_parse_date_yyyy_mm_dd(raw: str):
             yy = int(y) + (2000 if len(y) == 2 else 0) if len(y) == 2 else int(y)
             try:
                 return date(yy, _MONTHS[mon], int(d)).strftime("%Y-%m-%d")
-            except Exception:
+            except:
                 pass
 
     m2 = re.match(r'(?i)^\s*([A-Za-z]{3,})[\s\-\.]+(\d{1,2})[\s\-\,\.]+(\d{2,4})\s*$', s)
@@ -191,7 +210,7 @@ def try_parse_date_yyyy_mm_dd(raw: str):
             yy = int(y) + (2000 if len(y) == 2 else 0) if len(y) == 2 else int(y)
             try:
                 return date(yy, _MONTHS[mon], int(d)).strftime("%Y-%m-%d")
-            except Exception:
+            except:
                 pass
 
     return None
@@ -370,11 +389,14 @@ def parse_cheque_fields(lines: list, image_name: str):
         if m1:
             amount_numbers = m1.group(1).replace(",", "")
             break
-    if amount_numbers is None:
-        for l in lines:
-            m2 = re.search(r'\b([0-9][\d,]{4,}(?:\.\d{1,2})?)\b', l)
-            if m2:
-                amount_numbers = m2.group(1).replace(",", "")
+
+    # IFSC
+    for l in lines:
+        m = re.search(r'(?i)\bIFSC(?:\s*Code)?\b[:\-]?\s*([A-Za-z0-9]{11})', l)
+        if m:
+            cand = normalize_ifsc(m.group(1))
+            if cand:
+                ifsc_code = cand
                 break
 
     # Amount in words
