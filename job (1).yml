@@ -1,0 +1,32 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+
+inputs:
+  data:
+    type: string
+  model_config:
+    type: string
+  test_zip:
+    type: uri_file
+
+
+environment_variables:
+  SAS_TOKEN: ""
+  WHEELS_ZIP_URL: "https://azp229sa.blob.core.windows.net/azp229sacontainer/MLModels/TempModel/wheels.zip?sp=racwdl&st=2026-01-05T04:25:58Z&se=2027-01-05T12:40:58Z&spr=https&sv=2024-11-04&sr=c&sig=dYx9eaLT23ErT%2F6apfpUpcq9QXnnCYaUFvRIazrOuzc%3D"
+  #AZUREML_INPUT_model_config: ${{inputs.model_config}}
+
+
+code: .
+command: >-
+  python train_hybrid_recent.py
+  --data ${{inputs.data}}
+  --model_config ${{inputs.model_config}}
+  --test_zip ${{inputs.test_zip}}
+
+
+environment: 
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-cuda11.8-cudnn8-ubuntu22.04:20240226.v1
+
+compute: azureml:cpu-cluster-01
+display_name: Train hybrid model
+experiment_name: PINN_example_Train
+description: Training.

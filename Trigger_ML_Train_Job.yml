@@ -1,0 +1,134 @@
+trigger: none
+
+parameters:
+
+- name: username
+  type: string
+  default: ''
+
+- name: Simtime
+  type: string
+  default: ''
+
+- name: SimMode
+  type: string
+  default: ''
+
+- name: data
+  type: string
+  default: ''
+
+- name: model_config
+  type: string
+  default: ''
+
+
+variables:
+  resource-group: 'rg-rubrik-AZ-INT-Azp-229-Digital-Eng'
+  workspace: 'Azp-229-mw'
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+
+
+- script: |
+    echo "User Name: ${{ parameters.username }}"
+    echo "Simulation Time: ${{ parameters.Simtime }}"
+    echo "Simulation Mode: ${{ parameters.SimMode }}"
+    echo "csv data: ${{parameters.data}}"
+    echo "model_config: ${{ parameters.model_config }}"
+
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.9'
+    addToPath: true
+    architecture: 'x64'
+  displayName: "Use_PythonVersion_3.9"
+
+- task: Bash@3
+  inputs:
+    filePath: 'requirements/install-requirements.sh'
+  displayName: "Installing environment requirements"
+
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'Azp-229-Digital-Eng-SC'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: 'az extension add -n ml'
+  displayName: "Azure CLI installation"
+
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'Azp-229-Digital-Eng-SC'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: 'az account set --subscription bc066bbd-5435-4cf7-a2ef-32d63ba4951d && az configure --defaults workspace=Azp-229-mw group=rg-rubrik-AZ-INT-Azp-229-Digital-Eng'
+  displayName: "Settingup Resource Group & ML Workspace"
+
+# Install ml dependency packages
+- task: AzureCLI@2
+  displayName: "Install Azure ML SDK"
+  inputs:
+    azureSubscription: 'Azp-229-Digital-Eng-SC'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      python -m pip install --upgrade pip
+      pip install azure-ai-ml azure-identity
+      az extension add -n ml
+
+# Fetch AML compute info
+- task: AzureCLI@2
+  displayName: "Fetch AML compute specs"
+  inputs:
+    azureSubscription: 'Azp-229-Digital-Eng-SC'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az account set --subscription bc066bbd-5435-4cf7-a2ef-32d63ba4951d
+      python toFetchCompute.py
+
+#Download train_hybrid_recent.py
+- task: AzureCLI@2
+  displayName: "Download train_hybrid_train.py from Blob"
+  inputs:
+    azureSubscription: 'Azp-229-Digital-Eng-SC'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      echo "Downloading train_hybrid.py..."
+
+      curl -o config/train_hybrid_recent.py \
+        "https://azp229sa.blob.core.windows.net/azp229sacontainer/MLModels/TempModel/train_hybrid_recent.py?$(SAS_TOKEN)"
+
+      echo "Files inside config:"
+      ls -l config
+
+# Create ML job and capture job name
+- task: AzureCLI@2
+  name: submitJob
+  inputs:
+    azureSubscription: 'Azp-229-Digital-Eng-SC'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      JOB_NAME=$(az ml job create \
+        --file config/job.yml \
+        --set inputs.data="${{ parameters.data }}" \
+        --set inputs.model_config="${{ parameters.model_config }}" \
+        --set inputs.test_zip="https://azp229sa.blob.core.windows.net/azp229sacontainer/MLModels/TempModel/1365180.zip?$(SAS_TOKEN)" \
+        --set environment_variables.SAS_TOKEN="$(SAS_TOKEN)" \
+        --resource-group rg-rubrik-AZ-INT-Azp-229-Digital-Eng \
+        --workspace-name Azp-229-mw \
+        --query name -o tsv
+      )
+      echo "Job submitted: $JOB_NAME"
+      echo "##vso[task.setvariable variable=JOB_NAME]$JOB_NAME"
+
+  displayName: "Submit ML job & stream logs"
+
+
