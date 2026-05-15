@@ -1,0 +1,13 @@
+Model and config exported to 'exported_model/'
+
+==============================
+STARTING TESTING PHASE
+==============================
+Traceback (most recent call last):
+  File "/mnt/azureml/cr/j/7e844e6d6a0b498eb8af9467adf295cd/exe/wd/train_hybrid_recent.py", line 798, in <module>
+    test_hybrid_model(
+  File "/mnt/azureml/cr/j/7e844e6d6a0b498eb8af9467adf295cd/exe/wd/train_hybrid_recent.py", line 664, in test_hybrid_model
+    with zipfile.ZipFile(test_zip_path, "r") as z:
+  File "/opt/miniconda/lib/python3.10/zipfile.py", line 1251, in __init__
+    self.fp = io.open(file, filemode)
+FileNotFoundError: [Errno 2] No such file or directory: 'https://azp229sa.blob.core.windows.net/azp229sacontainer/MLModels/TempModel/1365180.zip?sp=racwdl&st=2026-01-05T04:25:58Z&se=2027-01-05T12:40:58Z&spr=https&sv=2024-11-04&sr=c&sig=dYx9eaLT23ErT%2F6apfpUpcq9QXnnCYaUFvRIazrOuzc%3D'
